@@ -10,6 +10,8 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 @ExtendWith({SpringExtension.class})
@@ -25,15 +27,11 @@ public class BookRepositoryTest {
 
     @Test
     @DisplayName("Must return true when exists a book with the given ISBN")
-    public void returnTrueWhenISBNExists() {
+    public void mustReturnTrueWhenISBNExists() {
 
         //given
         String isbn = "123456";
-        Book book = Book.builder()
-                .title("Book Title")
-                .author("Book Author")
-                .isbn(isbn)
-                .build();
+        Book book = createNewBook(isbn);
         entityManager.persist(book);
 
         //when
@@ -46,7 +44,7 @@ public class BookRepositoryTest {
 
     @Test
     @DisplayName("Must return false when does not exists a book with the given ISBN")
-    public void returnFalseWhenISBNDoesNotExists() {
+    public void mustReturnFalseWhenISBNDoesNotExists() {
 
         //given
         String isbn = "123456";
@@ -57,6 +55,63 @@ public class BookRepositoryTest {
         //then
         assertThat(bookExists).isFalse();
 
+    }
+
+    @Test
+    @DisplayName("Must get a book by id")
+    public void mustFindABookByIdTest() {
+
+        //given
+        Book book = createNewBook("123");
+        entityManager.persist(book);
+
+        //when
+        Optional<Book> foundBook = bookRespository.findById(book.getId());
+
+        //then
+        assertThat(foundBook.isPresent()).isTrue();
+
+    }
+
+    @Test
+    @DisplayName("Must save a book")
+    public void mustSaveABookTest() {
+
+        //given
+        Book book = createNewBook("123");
+
+        //when
+        Book savedBook = bookRespository.save(book);
+
+        //then
+        assertThat(savedBook.getId()).isNotNull();
+
+    }
+
+    @Test
+    @DisplayName("Must delete a book")
+    public void mustDeleteABookTest() {
+
+        //given
+        Book book = createNewBook("123");
+        entityManager.persist(book);
+        Book foundBook = entityManager.find( Book.class, book.getId() );
+
+        //when
+        bookRespository.delete(foundBook);
+        Book deletedBook = entityManager.find( Book.class, book.getId() );
+
+        //then
+        assertThat(deletedBook).isNull();
+
+    }
+
+    private Book createNewBook(String isbn) {
+        return Book.builder()
+                .title("Book Title")
+                .author("Book Author")
+                .isbn(isbn)
+                .build();
     }
 
 }

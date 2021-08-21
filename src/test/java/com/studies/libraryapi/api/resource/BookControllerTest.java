@@ -14,6 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -21,7 +24,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import java.util.Arrays;
+import java.util.Optional;
+
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -49,7 +57,7 @@ public class BookControllerTest {
                 .isbn("123456")
                 .build();
 
-        Book savedBook = getASavedBook();
+        Book savedBook = createABook();
 
         BDDMockito
                 .given(bookService.save(Mockito.any(Book.class)))
@@ -94,7 +102,7 @@ public class BookControllerTest {
     @DisplayName("Must throw an error when there is a duplicate isbn book")
     public void createBookWithDuplicateISBNTest() throws Exception {
 
-        String json = new ObjectMapper().writeValueAsString(getASavedBook());
+        String json = new ObjectMapper().writeValueAsString(createABook());
 
         String errorMessage = "ISBN already created";
 
@@ -115,8 +123,205 @@ public class BookControllerTest {
 
     }
 
-    private Book getASavedBook() {
+    @Test
+    @DisplayName("Must get book details")
+    public void mustGetDetailsBookTest() throws Exception {
+
+        //given
+        Long id = 1L;
+
+        Book book = Book.builder()
+                .id(id)
+                .title(createABook().getTitle())
+                .author(createABook().getAuthor())
+                .isbn(createABook().getIsbn())
+                .build();
+
+        BDDMockito
+                .given(bookService.getById(id))
+                .willReturn(Optional.of(book));
+
+        //when
+        MockHttpServletRequestBuilder request = MockMvcRequestBuilders
+                .get(BOOK_API + "/" + id)
+                .accept(MediaType.APPLICATION_JSON);
+
+        //then
+        mvc.perform( request )
+                .andExpect( status().isOk() )
+                .andExpect( jsonPath("id").value(id) )
+                .andExpect( jsonPath("title").value(createABook().getTitle()) )
+                .andExpect( jsonPath("author").value(createABook().getAuthor()) )
+                .andExpect( jsonPath("isbn").value(createABook().getIsbn()) );
+
+
+    }
+
+    @Test
+    @DisplayName("Must return resource not found when a book does not exists")
+    public void mustNotFoundAbookTest() throws Exception {
+
+        // given
+        BDDMockito
+                .given( bookService.getById(anyLong()) )
+                .willReturn( Optional.empty() );
+
+        // when
+        MockHttpServletRequestBuilder request = MockMvcRequestBuilders
+                .get(BOOK_API + "/" + anyLong())
+                .accept(MediaType.APPLICATION_JSON);
+
+        // then
+        mvc.perform( request )
+                .andExpect( status().isNotFound() );
+
+    }
+
+    @Test
+    @DisplayName("Must update a book")
+    public void mustUpdateABookTest() throws Exception {
+
+        //given
+        Long id = 1L;
+
+        String json = new ObjectMapper().writeValueAsString( createABook() );
+
+        Book updatingBook = Book.builder()
+                .id(1L)
+                .title("Some Title")
+                .author("Some Author")
+                .isbn("654")
+                .build();
+
+        BDDMockito
+                .given(bookService.getById(id))
+                .willReturn(Optional.of( updatingBook ));
+
+        Book updatedBook = Book.builder()
+                .id(1L)
+                .title("Title Book")
+                .author("Author Book")
+                .isbn("654")
+                .build();
+
+        BDDMockito
+                .given(bookService.update(updatingBook))
+                .willReturn(updatedBook);
+
+        //when
+        MockHttpServletRequestBuilder request = MockMvcRequestBuilders
+                .put(BOOK_API + "/" + id)
+                .content(json)
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON);
+
+        //then
+        mvc.perform( request )
+                .andExpect( status().isOk() )
+                .andExpect( jsonPath("id").value(id) )
+                .andExpect( jsonPath("title").value(updatedBook.getTitle()) )
+                .andExpect( jsonPath("author").value(updatedBook.getAuthor()) )
+                .andExpect( jsonPath("isbn").value("654") );
+
+    }
+
+    @Test
+    @DisplayName("Must return resource not found when to try to update an inexistent book")
+    public void mustNotUpdateAInexistentBookTest() throws Exception {
+
+        //given
+        String json = new ObjectMapper().writeValueAsString( createABook() );
+
+        BDDMockito
+                .given(bookService.getById(anyLong()))
+                .willReturn(Optional.empty());
+
+        //when
+        MockHttpServletRequestBuilder request = MockMvcRequestBuilders
+                .put(BOOK_API + "/" + anyLong())
+                .content(json)
+                .accept(MediaType.APPLICATION_JSON)
+                .contentType(MediaType.APPLICATION_JSON);
+
+        //then
+        mvc.perform( request )
+                .andExpect( status().isNotFound() );
+
+    }
+
+    @Test
+    @DisplayName("Must delete a book")
+    public void mustDeleteABookTest() throws Exception {
+
+        // given
+        BDDMockito
+                .given( bookService.getById(anyLong()) )
+                .willReturn( Optional.of( Book.builder().id(1L).build() ) );
+
+        // when
+        MockHttpServletRequestBuilder request = MockMvcRequestBuilders
+                .delete(BOOK_API + "/" + 1);
+
+        // then
+        mvc.perform( request )
+                .andExpect( status().isNoContent() );
+
+    }
+
+    @Test
+    @DisplayName("Must return resource not found when to try to delete an inexistent book")
+    public void mustNotDeleteAInexistentBookTest() throws Exception {
+
+        // given
+        BDDMockito
+                .given( bookService.getById(anyLong()) )
+                .willReturn( Optional.empty() );
+
+        // when
+        MockHttpServletRequestBuilder request = MockMvcRequestBuilders
+                .delete(BOOK_API + "/" + anyLong());
+
+        // then
+        mvc.perform( request )
+                .andExpect( status().isNotFound() );
+
+    }
+
+    @Test
+    @DisplayName("Must filter books")
+    public void mustFindBooksTest() throws Exception {
+        //given
+        Long id = 1L;
+        Book book = Book.builder()
+                .id(id)
+                .title(createABook().getTitle())
+                .author(createABook().getAuthor())
+                .isbn(createABook().getIsbn())
+                .build();
+
+        BDDMockito
+                .given( bookService.find(any(Book.class), any(Pageable.class)) )
+                .willReturn( new PageImpl<Book>( Arrays.asList(book), PageRequest.of(0, 100), 1 ) );
+
+        String queryString = String.format("?title=%s&author=%s&page=0&size=100", book.getTitle(), book.getAuthor());
+
+        //when
+        MockHttpServletRequestBuilder request = MockMvcRequestBuilders
+                .get(BOOK_API.concat(queryString))
+                .accept(MediaType.APPLICATION_JSON);
+
+        //then
+        mvc.perform( request )
+                .andExpect( status().isOk() )
+                .andExpect( jsonPath("content", hasSize(1)))
+                .andExpect( jsonPath("totalElements").value(1) )
+                .andExpect( jsonPath("pageable.pageSize").value(100) )
+                .andExpect( jsonPath("pageable.pageNumber").value(0) );
+    }
+
+    private Book createABook() {
         return Book.builder()
+                .id(1L)
                 .title("Book Title")
                 .author("Book Author")
                 .isbn("123456")
