@@ -60,6 +60,11 @@ public class BookServiceImpl implements BookService {
         bookRespository.delete(book);
     }
 
+    @Override
+    public Optional<Book> getBookByIsbn(String isbn) {
+        return bookRespository.findByIsbn(isbn);
+    }
+
     private boolean checkBookNull( Book book ) {
         return book == null || book.getId() == null;
     }

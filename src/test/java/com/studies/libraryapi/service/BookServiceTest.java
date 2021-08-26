@@ -28,14 +28,14 @@ import static org.mockito.Mockito.*;
 @ActiveProfiles("test")
 public class BookServiceTest {
 
-    BookService bookService;
+    BookService service;
 
     @MockBean
-    BookRespository bookRespository;
+    BookRespository repository;
 
     @BeforeEach
     public void setUp() {
-        this.bookService = new BookServiceImpl( bookRespository );
+        this.service = new BookServiceImpl(repository);
     }
 
     @Test
@@ -44,8 +44,8 @@ public class BookServiceTest {
         // given
         Book book = createAValidBook();
 
-        when( bookRespository.existsByIsbn(anyString()) ).thenReturn(false);
-        when( bookRespository.save(book) ).thenReturn(
+        when( repository.existsByIsbn(anyString()) ).thenReturn(false);
+        when( repository.save(book) ).thenReturn(
                 Book.builder()
                         .id(1L)
                         .title("Book Title")
@@ -55,7 +55,7 @@ public class BookServiceTest {
         );
 
         // when
-        Book savedBook = bookService.save(book);
+        Book savedBook = service.save(book);
 
         //then
         assertThat(savedBook.getId()).isNotNull();
@@ -71,8 +71,8 @@ public class BookServiceTest {
         Book book = createAValidBook();
 
         // when
-        when( bookRespository.existsByIsbn(anyString()) ).thenReturn(true);
-        Throwable exception = Assertions.catchThrowable(() -> bookService.save(book));
+        when( repository.existsByIsbn(anyString()) ).thenReturn(true);
+        Throwable exception = Assertions.catchThrowable(() -> service.save(book));
 
         //then
         String errorMessage = "ISBN already created";
@@ -80,7 +80,7 @@ public class BookServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(errorMessage);
 
-        verify(bookRespository, never()).save(book);
+        verify(repository, never()).save(book);
     }
 
     @Test
@@ -91,10 +91,10 @@ public class BookServiceTest {
         Long id = 1L;
         Book book = createAValidBook();
         book.setId(id);
-        when(bookRespository.findById(id)).thenReturn(Optional.of(book));
+        when(repository.findById(id)).thenReturn(Optional.of(book));
 
         //when
-        Optional<Book> foundBook = bookService.getById(id);
+        Optional<Book> foundBook = service.getById(id);
 
         //then
         assertThat(foundBook.isPresent()).isTrue();
@@ -111,10 +111,10 @@ public class BookServiceTest {
 
         //given
         Long id = 1L;
-        when(bookRespository.findById(id)).thenReturn(Optional.empty());
+        when(repository.findById(id)).thenReturn(Optional.empty());
 
         //when
-        Optional<Book> foundBook = bookService.getById(id);
+        Optional<Book> foundBook = service.getById(id);
 
         //then
         assertThat(foundBook.isPresent()).isFalse();
@@ -132,9 +132,9 @@ public class BookServiceTest {
         //when
         Book updatedBook = createAValidBook();
         updatedBook.setId(id);
-        when(bookRespository.save(updatingBook)).thenReturn(updatedBook);
+        when(repository.save(updatingBook)).thenReturn(updatedBook);
 
-        Book book = bookService.update(updatingBook);
+        Book book = service.update(updatingBook);
 
         //then
         assertThat(book.getId()).isEqualTo(updatedBook.getId());
@@ -151,10 +151,10 @@ public class BookServiceTest {
         Book book = new Book();
 
         //when
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> bookService.update(book));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> service.update(book));
 
         //then
-        verify(bookRespository, never()).save(book);
+        verify(repository, never()).save(book);
     }
 
     @Test
@@ -165,10 +165,10 @@ public class BookServiceTest {
         Book book = Book.builder().id(1L).build();
 
         //when
-        org.junit.jupiter.api.Assertions.assertDoesNotThrow( () -> bookService.delete(book));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow( () -> service.delete(book));
 
         //then
-        verify(bookRespository, times(1)).delete(book);
+        verify(repository, times(1)).delete(book);
     }
 
     @Test
@@ -179,10 +179,10 @@ public class BookServiceTest {
         Book book = new Book();
 
         //when
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> bookService.delete(book));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> service.delete(book));
 
         //then
-        verify(bookRespository, never()).delete(book);
+        verify(repository, never()).delete(book);
     }
 
     @Test
@@ -196,13 +196,13 @@ public class BookServiceTest {
 
         List<Book> list = Arrays.asList(book);
 
-        Page<Book> page = new PageImpl<Book>(list, pageRequest, 1);
+        Page<Book> page = new PageImpl<>(list, pageRequest, 1);
 
         //when
-        when( bookRespository.findAll( any(Example.class), any(PageRequest.class) ))
+        when( repository.findAll( any(Example.class), any(PageRequest.class) ))
                 .thenReturn(page);
 
-        Page<Book> result = bookService.find(book, pageRequest);
+        Page<Book> result = service.find(book, pageRequest);
 
         //then
         assertThat(result.getTotalElements()).isEqualTo(1);
@@ -210,6 +210,26 @@ public class BookServiceTest {
         assertThat(result.getPageable().getPageNumber()).isEqualTo(0);
         assertThat(result.getPageable().getPageSize()).isEqualTo(10);
 
+    }
+
+    @Test
+    @DisplayName("Must return a book when to try to find it by isbn")
+    public void mustGetABookByIsbnTest() {
+
+        //given
+        String isbn = "123";
+        when(repository.findByIsbn(isbn))
+                .thenReturn(Optional.of(Book.builder().id(1L).isbn(isbn).build()));
+
+        //when
+        Optional<Book> book = service.getBookByIsbn(isbn);
+
+        //then
+        assertThat(book.isPresent()).isTrue();
+        assertThat(book.get().getId()).isEqualTo(1L);
+        assertThat(book.get().getIsbn()).isEqualTo(isbn);
+
+        verify(repository, times(1)).findByIsbn(isbn);
 
     }
 
