@@ -92,7 +92,7 @@ public class BookController {
 
     @ApiOperation("Update a book by params")
     @PutMapping("{id}")
-    public BookDTO update( @PathVariable Long id, BookDTO dto ) {
+    public BookDTO update( @PathVariable Long id, @RequestBody @Valid BookDTO dto ) {
         log.info("deleting book by id: ", id);
         return service.getById(id)
                 .map(book -> {
